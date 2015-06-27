@@ -3,7 +3,7 @@ import unittest
 
 import ZODB
 
-from indexedzodb.models import ZODBModel
+from indexedzodb.models import ZODBModel, DuplicateIndex
 
 
 zodb = ZODB.DB(None)
@@ -13,10 +13,11 @@ connection = zodb.open()
 class Company(ZODBModel):
     name = None
     established = 0
-    
+
     class Meta:
         table = "company"
         connection = connection
+        index_fields = ('name', )
 
 
 class LocalDataTest(TestCase):
@@ -35,6 +36,13 @@ class LocalDataTest(TestCase):
 
         self.assertTrue(Company.count() == 3)
         self.assertTrue(len(Company.select(established=2005)) == 1)
+
+        try:
+            Company(name="Seaside Cafe", established=2005).save()
+            raise AssertionError("Duplicate index check failed")
+        except DuplicateIndex:
+            pass
+
 
 if __name__ == '__main__':
     unittest.main()

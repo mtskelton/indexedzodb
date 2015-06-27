@@ -10,7 +10,10 @@ class DoesNotExist(Exception):
     pass
 
 
-# TODO: Ensure that indexed fields remain unique!!
+class DuplicateIndex(Exception):
+    pass
+
+
 class ZODBModel(persistent.Persistent):
     _id = None
     _v_reindex = False
@@ -90,12 +93,11 @@ class ZODBModel(persistent.Persistent):
         """
         Update the index .. field by field
         """
-        if not self._id:
+        if not self._id or not value:
             return
 
         index_root = self._get_index_root(field)
         index_root[value] = self._id
-
 
     @classmethod
     def select(cls, *args, **kwargs):
@@ -107,7 +109,7 @@ class ZODBModel(persistent.Persistent):
                 return [cls._get_root()[index_root[value]]]
             return []
 
-        cmp = []
+        cmps = []
         for key in kwargs:
             try:
                 value = kwargs[key].replace("'", "\'")
@@ -116,14 +118,14 @@ class ZODBModel(persistent.Persistent):
             key = key.replace("'", "\'")
 
             if isinstance(value, int):
-                cmp.append("x.%s == %d" % (key, value))
+                cmps.append("x.%s == %d" % (key, value))
             else:
-                cmp.append("x.%s == '%s'" % (key, value))
+                cmps.append("x.%s == '%s'" % (key, value))
 
-        if len(cmp) == 0:
+        if len(cmps) == 0:
             return list(cls._get_root().values())
 
-        cmp_func = lambda x: eval(' and '.join(cmp))
+        cmp_func = lambda x: eval(' and '.join(cmps))
         return filter(lambda x: cmp_func(x), cls._get_root().values())
 
     @classmethod
@@ -148,6 +150,13 @@ class ZODBModel(persistent.Persistent):
         transaction.commit()
 
     def save(self, commit=True):
+        # Check for duplicate values in the index fields
+        for field in self._get_index_fields():
+            index_root = self._get_index_root(field)
+            value = getattr(self, field)
+            if value in index_root and index_root[value] != self._id:
+                raise DuplicateIndex("Indexed field %s contains duplicate value %s" % (field, value))
+
         root = self._get_root()
         if not self._id:
             self._id = self._get_safe_key(root)
