@@ -1,5 +1,5 @@
 from distutils.core import setup
-setup(name='indexzodb',
+setup(name='indexedzodb',
       version='0.0.1',
       license='MIT',
       description='A simple, indexed model layer over ZODB',
