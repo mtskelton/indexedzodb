@@ -173,6 +173,10 @@ class ZODBModel(persistent.Persistent):
     def delete(self, commit=True):
         root = self._get_root()
         if self._id:
+            for field in self._get_index_fields():
+                if getattr(self, field):
+                    self._remove_from_index(field, getattr(self, field))
+
             del root[self._id]
             self._id = None
 

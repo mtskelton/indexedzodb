@@ -43,6 +43,12 @@ class LocalDataTest(TestCase):
         except DuplicateIndex:
             pass
 
+        # Check remove from index
+        c = Company.get(name='Seaside Cafe')
+        c.delete()
+        
+        Company(name="Seaside Cafe", established=2005).save()
+
 
 if __name__ == '__main__':
     unittest.main()
