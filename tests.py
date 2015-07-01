@@ -46,7 +46,7 @@ class LocalDataTest(TestCase):
         # Check remove from index
         c = Company.get(name='Seaside Cafe')
         c.delete()
-        
+
         Company(name="Seaside Cafe", established=2005).save()
 
 

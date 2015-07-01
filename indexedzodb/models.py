@@ -112,15 +112,15 @@ class ZODBModel(persistent.Persistent):
         cmps = []
         for key in kwargs:
             try:
-                value = kwargs[key].replace("'", "\'")
+                value = kwargs[key].replace("'", "\\'")
             except AttributeError:
                 value = kwargs[key]
-            key = key.replace("'", "\'")
+            key = key.replace("'", "\\'")
 
             if isinstance(value, int):
-                cmps.append("x.%s == %d" % (key, value))
+                cmps.append("int(x.%s) == %d" % (key, value))
             else:
-                cmps.append("x.%s == '%s'" % (key, value))
+                cmps.append("x.%s == u'%s'" % (key, value))
 
         if len(cmps) == 0:
             return list(cls._get_root().values())
@@ -196,5 +196,8 @@ class ZODBModel(persistent.Persistent):
         if name[0] != '_' and name in self._get_index_fields() and getattr(self, name) != value:
             self._v_reindex = True
             self._remove_from_index(name, getattr(self, name))
+
+        if isinstance(value, ZODBModel):
+            value = unicode(value)
 
         persistent.Persistent.__setattr__(self, name, value)
