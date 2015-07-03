@@ -5,12 +5,16 @@ import persistent
 import BTrees
 import transaction
 
+from repoze.catalog.catalog import Catalog
+from repoze.catalog.query import Eq
+from repoze.catalog.indexes.field import CatalogFieldIndex
+
 
 class DoesNotExist(Exception):
     pass
 
 
-class DuplicateIndex(Exception):
+class NoIndex(Exception):
     pass
 
 
@@ -50,9 +54,34 @@ class ZODBModel(persistent.Persistent):
         if not hasattr(root, cls.Meta.table):
             model_root = BTrees.OOBTree.BTree()
             setattr(root, cls.Meta.table, model_root)
-            model_root['indexes'] = BTrees.OOBTree.BTree()
             model_root['objects'] = BTrees.OOBTree.BTree()
-        return getattr(root, cls.Meta.table)
+            model_root['catalog'] = Catalog()
+            model_root['catalog_index'] = None
+
+        model_root = getattr(root, cls.Meta.table)
+        # Regenerate index fields?
+        if 'catalog_index' not in model_root or model_root['catalog_index'] != cls._get_index_fields():
+            catalog = Catalog()
+            for field in cls._get_index_fields():
+                catalog[field] = CatalogFieldIndex(field)
+
+            model_root['catalog'] = catalog
+            model_root['catalog_index'] = cls._get_index_fields()
+
+            cls.commit()
+            cls.index()
+
+        return model_root
+
+    @classmethod
+    def index(cls):
+        root = cls._get_root()
+        catalog = cls._get_catalog()
+        for key in root:
+            obj = root[key]
+            catalog.reindex_doc(key, obj)
+
+        cls.commit()
 
     @classmethod
     def _get_root(cls):
@@ -60,76 +89,51 @@ class ZODBModel(persistent.Persistent):
         return model_root['objects']
 
     @classmethod
-    def _get_index_root(cls, field):
+    def _get_catalog(cls):
         model_root = cls._get_model_root()
-        index_root = model_root['indexes']
-        if field not in index_root:
-            index_root[field] = BTrees.OOBTree.BTree()
-        return index_root[field]
+        if 'catalog' not in model_root:
+            model_root['catalog'] = Catalog()
+        return model_root['catalog']
 
     @classmethod
-    def index(cls):
-        for field in cls._get_index_fields():
-            index_root = cls._get_index_root(field)
-            index_root.clear()
+    def select(cls, attempt=0, *args, **kwargs):
+        catalog = cls._get_catalog()
+        qo = None
 
-        for o in cls.select():
-            for field in cls._get_index_fields():
-                index_root = cls._get_index_root(field)
-                index_root[getattr(o, field)] = o._id
-
-    def _remove_from_index(self, field, value):
-        """
-        Remove this from the given index as the field value has changed
-        """
-        if not self._id:
-            return
-
-        index_root = self._get_index_root(field)
-        if value in index_root:
-            del index_root[value]
-
-    def _add_to_index(self, field, value):
-        """
-        Update the index .. field by field
-        """
-        if not self._id or not value:
-            return
-
-        index_root = self._get_index_root(field)
-        index_root[value] = self._id
-
-    @classmethod
-    def select(cls, *args, **kwargs):
-        if len(kwargs) == 1 and kwargs.keys()[0] in cls._get_index_fields():
-            # We can use an index table
-            index_root = cls._get_index_root(kwargs.keys()[0])
-            value = kwargs[kwargs.keys()[0]]
-            if value in index_root:
-                return [cls._get_root()[index_root[value]]]
-            return []
-
-        cmps = []
         for key in kwargs:
-            try:
-                value = kwargs[key].replace("'", "\\'")
-            except AttributeError:
-                value = kwargs[key]
-            key = key.replace("'", "\\'")
+            if key not in catalog.keys():
+                print catalog.keys()
+                raise NoIndex('The field %s is not in the list of indexed fields for %s' % (key, cls.__name__))
+            value = kwargs[key]
 
-            if isinstance(value, int):
-                cmps.append("int(x.%s) == %d" % (key, value))
+            if isinstance(value, ZODBModel):
+                value = unicode(value)
+
+            nqo = Eq(key, value)
+
+            if qo:
+                qo = qo & nqo
             else:
-                cmps.append("x.%s == u'%s'" % (key, value))
+                qo = nqo
 
-        if len(cmps) == 0:
-            return list(cls._get_root().values())
+        root = cls._get_root()
+        if qo:
+            _, results = catalog.query(qo)
+        else:
+            results = root.keys()
 
-        cmp_func = lambda x: eval(' and '.join(cmps))
-        return filter(lambda x: cmp_func(x), cls._get_root().values())
+        try:
+            return [root[x] for x in results]
+        except KeyError, e:
+            if attempt < 2:
+                cls.index()
+                return cls.select(attempt=attempt + 1, *args, **kwargs)
+            raise e
 
     @classmethod
     def count(cls, *args, **kwargs):
+        if len(kwargs) == 0:
+            return len(cls._get_root())
         return len(cls.select(*args, **kwargs))
 
     @classmethod
@@ -140,9 +144,9 @@ class ZODBModel(persistent.Persistent):
             raise DoesNotExist()
 
     def _get_safe_key(self, root):
-        key = uuid.uuid1().hex
+        key = self.count() + 1
         while key in root:
-            key = uuid.uuid1().hex
+            key += 1
         return key
 
     @classmethod
@@ -150,22 +154,13 @@ class ZODBModel(persistent.Persistent):
         transaction.commit()
 
     def save(self, commit=True):
-        # Check for duplicate values in the index fields
-        for field in self._get_index_fields():
-            index_root = self._get_index_root(field)
-            value = getattr(self, field)
-            if value in index_root and index_root[value] != self._id:
-                raise DuplicateIndex("Indexed field %s contains duplicate value %s" % (field, value))
-
         root = self._get_root()
         if not self._id:
             self._id = self._get_safe_key(root)
         root[self._id] = self
 
-        if self._v_reindex:
-            for field in self._get_index_fields():
-                self._add_to_index(field, getattr(self, field))
-            self._v_reindex = False
+        catalog = self._get_catalog()
+        catalog.reindex_doc(self._id, self)
 
         if commit:
             transaction.commit()
@@ -173,9 +168,8 @@ class ZODBModel(persistent.Persistent):
     def delete(self, commit=True):
         root = self._get_root()
         if self._id:
-            for field in self._get_index_fields():
-                if getattr(self, field):
-                    self._remove_from_index(field, getattr(self, field))
+            catalog = self._get_catalog()
+            catalog.unindex_doc(self._id)
 
             del root[self._id]
             self._id = None
@@ -193,10 +187,6 @@ class ZODBModel(persistent.Persistent):
         return unicode(self.getPk())
 
     def __setattr__(self, name, value):
-        if name[0] != '_' and name in self._get_index_fields() and getattr(self, name) != value:
-            self._v_reindex = True
-            self._remove_from_index(name, getattr(self, name))
-
         if isinstance(value, ZODBModel):
             value = unicode(value)
 
