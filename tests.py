@@ -39,9 +39,15 @@ class LocalDataTest(TestCase):
 
         self.assertTrue(Company.count() == 4)
         self.assertTrue(len(Company.select(established=2005)) == 2)
- 
+        self.assertTrue(len(Company.select(established__gt=2000)) == 2)
+
+        self.assertTrue(len(Company.select(established__lt=2000)) == 2)
+
         # Check remove from index
         c = Company.get(name='Seaside Cafe')
+
+        self.assertTrue(Company.get(_id=c._id).name == c.name)
+
         c.delete()
  
         self.assertTrue(Company.count(name='Seaside Cafe') == 0)

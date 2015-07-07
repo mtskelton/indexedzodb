@@ -6,7 +6,7 @@ import BTrees
 import transaction
 
 from repoze.catalog.catalog import Catalog
-from repoze.catalog.query import Eq
+from repoze.catalog.query import Eq, Gt, Lt, Ge, Le, Contains, DoesNotContain, NotEq, Any, NotAny
 from repoze.catalog.indexes.field import CatalogFieldIndex
 
 
@@ -101,15 +101,41 @@ class ZODBModel(persistent.Persistent):
         qo = None
 
         for key in kwargs:
+            key_parts = key.split('__', 1)
+            original_key = key
+
+            key = key_parts[0]
             if key not in catalog.keys():
                 print catalog.keys()
                 raise NoIndex('The field %s is not in the list of indexed fields for %s' % (key, cls.__name__))
-            value = kwargs[key]
+            value = kwargs[original_key]
 
             if isinstance(value, ZODBModel):
                 value = unicode(value)
 
-            nqo = Eq(key, value)
+            if len(key_parts) == 2:
+                if key_parts[1] == 'gt':
+                    nqo = Gt(key, value)
+                elif key_parts[1] == 'lt':
+                    nqo = Lt(key, value)
+                elif key_parts[1] == 'gte':
+                    nqo = Ge(key, value)
+                elif key_parts[1] == 'lte':
+                    nqo = Le(key, value)
+                elif key_parts[1] == 'contains':
+                    nqo = Contains(key, value)
+                elif key_parts[1] == 'ncontains':
+                    nqo = DoesNotContain(key, value)
+                elif key_parts[1] == 'ne':
+                    nqo = NotEq(key, value)
+                elif key_parts[1] == 'in':
+                    nqo = Any(key, value)
+                elif key_parts[1] == 'nin':
+                    nqo = NotAny(key, value)
+                else:
+                    raise Exception("Unknown comparator %s" % (key_parts[1]))
+            else:
+                nqo = Eq(key, value)
 
             if qo:
                 qo = qo & nqo
@@ -138,6 +164,11 @@ class ZODBModel(persistent.Persistent):
 
     @classmethod
     def get(cls, *args, **kwargs):
+        if '_id' in kwargs:
+            try:
+                return cls._get_root()[kwargs['_id']]
+            except Exception:
+                raise DoesNotExist()
         try:
             return cls.select(*args, **kwargs)[0]
         except IndexError:
