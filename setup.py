@@ -1,6 +1,6 @@
 from distutils.core import setup
 setup(name='indexedzodb',
-      version='0.0.4',
+      version='0.0.5',
       license='MIT',
       description='A simple, indexed model layer over ZODB',
       author='Mark Skelton',

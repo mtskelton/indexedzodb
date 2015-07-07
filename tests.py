@@ -35,25 +35,27 @@ class LocalDataTest(TestCase):
         Company(name="Seaside Cafe", established=2005).save()
         Company(name="Bob's Dive Bar", established=2005).save()
 
+        self.assertTrue(Company.select(sort_index='name')[0].name == "Bob's Dive Bar")
 
         self.assertTrue(Company.count() == 4)
         self.assertTrue(len(Company.select(established=2005)) == 2)
-
+ 
         # Check remove from index
         c = Company.get(name='Seaside Cafe')
         c.delete()
-
+ 
         self.assertTrue(Company.count(name='Seaside Cafe') == 0)
-
+ 
         Company(name="Seaside Cafe", established=2005).save()
-
+ 
         # Quotes
         c = Company.get(name="Timmy's Tea Mugs")
         self.assertTrue(c is not None)
-
+ 
         Company(name="Slash \\'n\\' Quotes").save()
         c = Company.get(name="Slash \\'n\\' Quotes")
         self.assertTrue(c is not None)
+
 
 
 if __name__ == '__main__':

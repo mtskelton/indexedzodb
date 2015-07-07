@@ -96,7 +96,7 @@ class ZODBModel(persistent.Persistent):
         return model_root['catalog']
 
     @classmethod
-    def select(cls, attempt=0, *args, **kwargs):
+    def select(cls, attempt=0, sort_index=None, reverse=False, limit=None, *args, **kwargs):
         catalog = cls._get_catalog()
         qo = None
 
@@ -118,9 +118,9 @@ class ZODBModel(persistent.Persistent):
 
         root = cls._get_root()
         if qo:
-            _, results = catalog.query(qo)
+            _, results = catalog.query(qo, sort_index=sort_index, reverse=reverse, limit=limit)
         else:
-            results = root.keys()
+            _, results = catalog.sort_result(root.keys(), sort_index=sort_index, reverse=reverse, limit=limit)
 
         try:
             return [root[x] for x in results]
