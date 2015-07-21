@@ -49,20 +49,20 @@ class LocalDataTest(TestCase):
         self.assertTrue(Company.get(_id=c._id).name == c.name)
 
         c.delete()
- 
+
         self.assertTrue(Company.count(name='Seaside Cafe') == 0)
- 
+
         Company(name="Seaside Cafe", established=2005).save()
- 
+
         # Quotes
         c = Company.get(name="Timmy's Tea Mugs")
         self.assertTrue(c is not None)
- 
+
         Company(name="Slash \\'n\\' Quotes").save()
         c = Company.get(name="Slash \\'n\\' Quotes")
         self.assertTrue(c is not None)
 
-
+        Company(name="Bob's Dive Bar", established=2005).save()
 
 if __name__ == '__main__':
     unittest.main()
