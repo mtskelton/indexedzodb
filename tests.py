@@ -4,6 +4,7 @@ import unittest
 import ZODB
 
 from indexedzodb.models import ZODBModel
+import datetime
 
 
 zodb = ZODB.DB(None)
@@ -18,6 +19,15 @@ class Company(ZODBModel):
         table = "company"
         connection = connection
         index_fields = ('name', 'established',)
+
+
+class Ticker(ZODBModel):
+    name = None
+
+    class Meta:
+        table = "ticker"
+        connection = connection
+        index_fields = ('name',)
 
 
 class LocalDataTest(TestCase):
@@ -64,5 +74,11 @@ class LocalDataTest(TestCase):
 
         Company(name="Bob's Dive Bar", established=2005).save()
 
+        # Massive keys
+        start = datetime.datetime.now()
+        for n in range(100000):
+            Ticker(name="ticker %s" % (n)).save(commit=False)
+        Ticker.commit()
+        print "Generated %d records in %s" % (Ticker.count(), datetime.datetime.now() - start)
 if __name__ == '__main__':
     unittest.main()

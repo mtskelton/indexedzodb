@@ -180,9 +180,10 @@ class ZODBModel(persistent.Persistent):
             raise DoesNotExist()
 
     def _get_safe_key(self, root):
-        key = self.count() + 1
-        while key in root:
-            key += 1
+        try:
+            key = root.maxKey() + 1
+        except ValueError:
+            key = 1
         return key
 
     @classmethod
