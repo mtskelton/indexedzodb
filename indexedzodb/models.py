@@ -199,7 +199,7 @@ class ZODBModel(persistent.Persistent):
         for field in self._get_index_fields():
             val = getattr(self, field)
             if val is None:
-                setattr(self, '')
+                setattr(self, field, '')
 
         catalog = self._get_catalog()
         catalog.reindex_doc(self._id, self)
