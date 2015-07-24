@@ -57,6 +57,7 @@ class ZODBModel(persistent.Persistent):
             model_root['objects'] = BTrees.OOBTree.BTree()
             model_root['catalog'] = Catalog()
             model_root['catalog_index'] = None
+            model_root['last_key'] = 0
 
         model_root = getattr(root, cls.Meta.table)
         # Regenerate index fields?
@@ -180,10 +181,14 @@ class ZODBModel(persistent.Persistent):
             raise DoesNotExist()
 
     def _get_safe_key(self, root):
-        try:
-            key = root.maxKey() + 1
-        except ValueError:
-            key = 1
+        model = self._get_model_root()
+        if 'last_key' not in model:
+            model['last_key'] = 0
+        key = model['last_key'] + 1
+
+        while key in root:
+            key += 1
+        model['last_key'] = key
         return key
 
     @classmethod
