@@ -91,5 +91,9 @@ class LocalDataTest(TestCase):
         commit_start = datetime.datetime.now()
         Ticker.commit()
         print "Generated %d records in %s (commit: %s)" % (Ticker.count(), datetime.datetime.now() - start, datetime.datetime.now() - commit_start)
+
+        ticker = Ticker.get(name="ticker 10")
+        self.assertTrue(ticker is not None)
+
 if __name__ == '__main__':
     unittest.main()

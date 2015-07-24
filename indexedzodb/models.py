@@ -99,9 +99,7 @@ class ZODBModel(persistent.Persistent):
         return model_root['catalog']
 
     @classmethod
-    def select(cls, attempt=0, sort_index=None, reverse=False, limit=None, sync_connection=True, *args, **kwargs):
-#         if sync_connection:
-#             cls._get_connection().sync()
+    def select(cls, attempt=0, sort_index=None, reverse=False, limit=None, *args, **kwargs):
         catalog = cls._get_catalog()
         qo = None
 
@@ -197,11 +195,14 @@ class ZODBModel(persistent.Persistent):
             self._id = self._get_safe_key(root)
         root[self._id] = self
 
+        # Check catalog fields
+        for field in self._get_index_fields():
+            val = getattr(self, field)
+            if val is None:
+                setattr(self, '')
+
         catalog = self._get_catalog()
-        try:
-            catalog.reindex_doc(self._id, self)
-        except TypeError:
-            pass
+        catalog.reindex_doc(self._id, self)
 
         if commit:
             transaction.commit()
