@@ -1,14 +1,17 @@
 from unittest.case import TestCase
 import unittest
+import datetime
 
 import ZODB
+from ZEO.ClientStorage import ClientStorage
 
 from indexedzodb.models import ZODBModel
-import datetime
 
 
 zodb = ZODB.DB(None)
 connection = zodb.open()
+# zodb = ZODB.DB(ClientStorage(('127.0.0.1', 8090), wait=False))
+# connection = zodb.open()
 
 
 class Company(ZODBModel):
@@ -38,6 +41,12 @@ class LocalDataTest(TestCase):
         TestCase.tearDown(self)
 
     def test_basic_models(self):
+        for rec in Company.select():
+            rec.delete(commit=False)
+        for rec in Ticker.select():
+            rec.delete(commit=False)
+        Ticker.commit()
+
         self.assertTrue(Company.count() == 0)
 
         Company(name="Brickmakers Inc", established=1989).save()
@@ -76,9 +85,11 @@ class LocalDataTest(TestCase):
 
         # Massive keys
         start = datetime.datetime.now()
-        for n in range(100000):
+        for n in range(10000):
             Ticker(name="ticker %s" % (n)).save(commit=False)
+
+        commit_start = datetime.datetime.now()
         Ticker.commit()
-        print "Generated %d records in %s" % (Ticker.count(), datetime.datetime.now() - start)
+        print "Generated %d records in %s (commit: %s)" % (Ticker.count(), datetime.datetime.now() - start, datetime.datetime.now() - commit_start)
 if __name__ == '__main__':
     unittest.main()
