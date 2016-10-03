@@ -109,7 +109,7 @@ class ZODBModel(persistent.Persistent):
 
             key = key_parts[0]
             if key not in catalog.keys():
-                print catalog.keys()
+                print(catalog.keys())
                 raise NoIndex('The field %s is not in the list of indexed fields for %s' % (key, cls.__name__))
             value = kwargs[original_key]
 
@@ -153,7 +153,7 @@ class ZODBModel(persistent.Persistent):
 
         try:
             return [root[x] for x in results]
-        except KeyError, e:
+        except KeyError as e:
             if attempt < 2:
                 cls.index()
                 return cls.select(attempt=attempt + 1, *args, **kwargs)

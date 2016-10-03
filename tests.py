@@ -62,6 +62,10 @@ class LocalDataTest(TestCase):
 
         self.assertTrue(len(Company.select(established__lt=2000)) == 2)
 
+        # In
+        print(Company.select(name__in=["Bob's Dive Bar", "Seaside Cafe"]))
+        self.assertTrue(len(Company.select(name__in=["Bob's Dive Bar", "Seaside Cafe"])) == 2)
+
         # Check remove from index
         c = Company.get(name='Seaside Cafe')
 
@@ -90,7 +94,7 @@ class LocalDataTest(TestCase):
 
         commit_start = datetime.datetime.now()
         Ticker.commit()
-        print "Generated %d records in %s (commit: %s)" % (Ticker.count(), datetime.datetime.now() - start, datetime.datetime.now() - commit_start)
+        print("Generated %d records in %s (commit: %s)" % (Ticker.count(), datetime.datetime.now() - start, datetime.datetime.now() - commit_start))
 
         ticker = Ticker.get(name="ticker 10")
         self.assertTrue(ticker is not None)
